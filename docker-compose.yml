@@ -27,7 +27,7 @@ services:
       - BOT_TOKEN=${BOT_TOKEN}
       - GROUP_CHAT_ID=${GROUP_CHAT_ID}
       - DATABASE_URL=postgresql://botuser:botpassword@db:5432/anonbotdb
-      - RATE_LIMIT_SECONDS=${RATE_LIMIT_SECONDS:-120}
+      - RATE_LIMIT_SECONDS=${RATE_LIMIT_SECONDS:-15}
       - PROFANITY_WORDS=${PROFANITY_WORDS:-""}
     command: |
       sh -c "

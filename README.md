@@ -38,7 +38,7 @@ BOT_TOKEN=123456:ABC-DEF1234ghIkl-zyx57W2v1u123456789
 GROUP_CHAT_ID=-1001234567890
 
 # (Optional) Cooldown time in seconds between comments for a single user
-# RATE_LIMIT_SECONDS=120
+# RATE_LIMIT_SECONDS=15
 
 # (Optional) Comma-separated list of words to block
 # PROFANITY_WORDS=word1,word2,another
@@ -87,6 +87,7 @@ docker compose up --build
 ```
 
 This command will:
+
 1.  Build the Docker image for the bot.
 2.  Start the PostgreSQL database container.
 3.  Wait for the database to be ready.

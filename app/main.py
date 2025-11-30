@@ -22,7 +22,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # Conversation states
-SELECT_TARGET, WAIT_COMMENT = range(2)
+SELECT_TARGET, WAIT_COMMENT, ASK_REDO = range(3)
 
 # In-memory state to hold the chosen target for a user.
 # Note: This is a simple approach. For a bot that needs to scale or be
@@ -74,7 +74,6 @@ async def receive_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
     user_id = update.message.from_user.id
     comment_text = update.message.text
 
-    # Retrieve the stored target for this user
     target_key = user_target.get(user_id)
     if not target_key:
         await update.message.reply_text(
@@ -82,16 +81,12 @@ async def receive_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         )
         return ConversationHandler.END
 
-    # --- Validation ---
-    # 1. Profanity check
     if contains_profanity(comment_text):
         await update.message.reply_text(
             "Your message appears to contain inappropriate language. Please revise it and send again."
         )
-        # Stay in the same state to allow user to re-submit
         return WAIT_COMMENT
 
-    # 2. Rate limit check
     user_record = await get_user_last_comment(user_id)
     last_time = user_record["last_comment_at"] if user_record else None
     is_allowed, retry_after = allowed_by_rate_limit(last_time)
@@ -100,15 +95,11 @@ async def receive_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
         await update.message.reply_text(
             f"You are sending comments too quickly. Please wait {retry_after} more seconds."
         )
-        # Stay in the same state
         return WAIT_COMMENT
 
-    # --- Processing ---
     try:
-        # Save the comment to the database
         await save_comment(target_key, comment_text, user_id)
 
-        # Format and send the message to the group ANONYMOUSLY
         target_name = TARGETS[target_key]
         message_to_group = (
             f"📌 *New Anonymous Comment*\n\n"
@@ -124,15 +115,48 @@ async def receive_comment(update: Update, context: ContextTypes.DEFAULT_TYPE) ->
             "Thank you! Your anonymous comment has been delivered."
         )
 
+        keyboard = [
+            [
+                InlineKeyboardButton("Yes, send another", callback_data="start_over"),
+                InlineKeyboardButton("No, I'm done", callback_data="finish"),
+            ]
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.message.reply_text(
+            "Would you like to send another comment?", reply_markup=reply_markup
+        )
+        return ASK_REDO
+
     except Exception as e:
         logger.error(f"Error processing comment for user {user_id}: {e}", exc_info=True)
         await update.message.reply_text(
             "Sorry, there was an error delivering your comment. Please try again later."
         )
+        user_target.pop(user_id, None)
+        return ConversationHandler.END
 
-    # Clean up the temporary state and end the conversation
-    user_target.pop(user_id, None)
-    return ConversationHandler.END
+
+async def redo_choice(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
+    """Handles the user's choice to start over or finish the conversation."""
+    query = update.callback_query
+    await query.answer()
+    user_id = query.from_user.id
+
+    if query.data == 'start_over':
+        user_target.pop(user_id, None)
+        keyboard = [
+            [InlineKeyboardButton(name, callback_data=key)]
+            for key, name in TARGETS.items()
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            "Please select who you'd like to comment on:", reply_markup=reply_markup
+        )
+        return SELECT_TARGET
+    else:  # 'finish'
+        user_target.pop(user_id, None)
+        await query.edit_message_text("Thank you for your feedback. Goodbye!")
+        return ConversationHandler.END
 
 
 async def cancel(update: Update, context: ContextTypes.DEFAULT_TYPE) -> int:
@@ -178,8 +202,11 @@ def main() -> None:
             WAIT_COMMENT: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, receive_comment)
             ],
+            ASK_REDO: [
+                CallbackQueryHandler(redo_choice)
+            ],
         },
-        fallbacks=[CommandHandler("cancel", cancel)],
+        fallbacks=[CommandHandler("cancel", cancel), CommandHandler("start", start)],
         per_user=True,
         per_chat=True,
     )
