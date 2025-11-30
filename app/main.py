@@ -160,7 +160,13 @@ async def on_shutdown(application):
 def main() -> None:
     """Run the bot."""
     # Build the application
-    application = ApplicationBuilder().token(BOT_TOKEN).build()
+    application = (
+        ApplicationBuilder()
+        .token(BOT_TOKEN)
+        .post_init(on_startup)
+        .post_shutdown(on_shutdown)
+        .build()
+    )
 
     # Define the conversation handler
     conv_handler = ConversationHandler(
@@ -174,13 +180,11 @@ def main() -> None:
             ],
         },
         fallbacks=[CommandHandler("cancel", cancel)],
+        per_user=True,
+        per_chat=True,
     )
 
     application.add_handler(conv_handler)
-    
-    # Add lifecycle hooks
-    application.post_init.append(on_startup)
-    application.post_shutdown.append(on_shutdown)
 
     # Run the bot until the user presses Ctrl-C
     logger.info("Bot is starting...")
