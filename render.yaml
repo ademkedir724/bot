@@ -1,10 +1,8 @@
-# render.yaml
-services:
-  # A PostgreSQL database for the bot
-  - type: psql
-    name: anonbot-db
-    plan: free # You can use the free plan for the database
+databases:
+  - name: anonbot-db
+    plan: free
 
+services:
   # The bot worker
   - type: worker
     name: telegram-anon-bot
@@ -13,7 +11,7 @@ services:
     envVars:
       - key: DATABASE_URL
         fromDatabase:
-          name: anonbot-db # This must match the name of the psql service
+          name: anonbot-db # This must match the name of the database definition above
           property: connectionString
       # Secrets (BOT_TOKEN and GROUP_CHAT_ID) are set in the Render dashboard.
       # We add them here with 'sync: false' to tell Render not to overwrite them.
