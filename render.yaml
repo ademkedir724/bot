@@ -1,0 +1,25 @@
+# render.yaml
+services:
+  # A PostgreSQL database for the bot
+  - type: psql
+    name: anonbot-db
+    plan: free # You can use the free plan for the database
+
+  # The bot worker
+  - type: worker
+    name: telegram-anon-bot
+    env: docker
+    # The start.sh script from your Dockerfile is used automatically.
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: anonbot-db # This must match the name of the psql service
+          property: connectionString
+      # Secrets (BOT_TOKEN and GROUP_CHAT_ID) are set in the Render dashboard.
+      # We add them here with 'sync: false' to tell Render not to overwrite them.
+      - key: BOT_TOKEN
+        sync: false
+      - key: GROUP_CHAT_ID
+        sync: false
+      - key: RATE_LIMIT_SECONDS # This is not a secret, so we can set it here.
+        value: 15

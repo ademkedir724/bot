@@ -17,7 +17,6 @@ RUN pip install --no-cache-dir --upgrade pip && \
 COPY ./app /app/app
 COPY ./migrations /app/migrations
 
-# The command to run the application will be specified in docker-compose.yml
-# to allow for a startup script that waits for the DB and runs migrations.
-# This CMD is a fallback for running the container directly.
-CMD ["python", "-m", "app.main"]
+# Copy the startup script and make it the entrypoint
+COPY start.sh .
+CMD ["./start.sh"]
